@@ -40,19 +40,6 @@ function initSmoothAnimations() {
     });
 }
 
-// Preloader
-window.addEventListener('load', function() {
-    const preloader = document.getElementById('preloader');
-    if (preloader) {
-        setTimeout(() => {
-            preloader.classList.add('hidden');
-            setTimeout(() => {
-                preloader.remove();
-            }, 500);
-        }, 1000);
-    }
-});
-
 
 // Navbar scroll effect
 window.addEventListener('scroll', function() {
@@ -831,7 +818,7 @@ function submitOrder() {
     message += `⏰ *Время заказа:* ${new Date().toLocaleString('ru-RU')}`;
     
     // Open WhatsApp
-    const whatsappUrl = `https://wa.me/77758747861?text=${encodeURIComponent(message)}`;
+    const whatsappUrl = `https://wa.me/77769460022?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
     
     // Close modal and show success message
@@ -959,6 +946,92 @@ document.head.appendChild(style);
 // Initialize floating animations
 document.addEventListener('DOMContentLoaded', addFloatingAnimation);
 
+// Submit consultation form to Telegram
+function submitConsultationForm() {
+    const name = document.getElementById('consultationName').value.trim();
+    const phone = document.getElementById('consultationPhone').value.trim();
+    
+    if (!name || !phone) {
+        showNotification('Пожалуйста, заполните все обязательные поля', 'error');
+        return;
+    }
+    
+    // Показываем индикатор загрузки
+    const submitButton = document.querySelector('#consultationForm button[type="submit"]');
+    const originalText = submitButton.innerHTML;
+    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправляем...';
+    submitButton.disabled = true;
+    
+    // Отправляем данные в PHP скрипт
+    fetch('send_telegram.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            name: name,
+            phone: phone
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Спасибо, что выбрали нас! Ваша заявка успешно отправлена. Мы свяжемся с вами в ближайшее время.', 'success');
+            document.getElementById('consultationForm').reset();
+        } else {
+            showNotification(data.message || 'Произошла ошибка при отправке', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Произошла ошибка при отправке. Попробуйте позже.', 'error');
+    })
+    .finally(() => {
+        // Восстанавливаем кнопку
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
+    });
+}
+
+// Show notification function
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} position-fixed`;
+    notification.style.cssText = `
+        top: 100px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        max-width: 400px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        border-radius: 8px;
+        animation: slideInRight 0.3s ease-out;
+    `;
+    
+    const icon = type === 'error' ? 'fas fa-exclamation-circle' : 
+                 type === 'success' ? 'fas fa-check-circle' : 'fas fa-info-circle';
+    
+    notification.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="${icon} me-2"></i>
+            <div>
+                <div>${message}</div>
+            </div>
+            <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Автоматически удаляем через 5 секунд
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => notification.remove(), 300);
+        }
+    }, 5000);
+}
+
 // Consultation form handling
 document.addEventListener('DOMContentLoaded', function() {
     const consultationForm = document.getElementById('consultationForm');
@@ -986,96 +1059,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Submit consultation form to Telegram
-async function submitConsultationForm() {
-    const name = document.getElementById('consultationName').value.trim();
-    const phone = document.getElementById('consultationPhone').value.trim();
-    
-    if (!name || !phone) {
-        alert('Пожалуйста, заполните все обязательные поля');
-        return;
-    }
-    
-    // Create message for Telegram
-    const message = `🔔 *ЗАЯВКА НА КОНСУЛЬТАЦИЮ*\n\n👤 *Имя:* ${name}\n📱 *Телефон:* ${phone}\n\n⏰ *Время:* ${new Date().toLocaleString('ru-RU')}\n\n💬 *Источник:* Сайт territoria-sna.kz`;
-    
-    const botToken = '7618751385:AAGLKry1_Rnd7rwFY5QkqjDxIfFu1WqB654';
-    const chatIds = ['@Olzhiki', '@TerritoriaSna1', '@boranbay07'];
-    
-    // Show loading state
-    const submitBtn = document.querySelector('.btn-consultation');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправляем...';
-    submitBtn.disabled = true;
-    
-    try {
-        // Send to all three Telegram accounts
-        const promises = chatIds.map(chatId => 
-            fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    chat_id: chatId,
-                    text: message,
-                    parse_mode: 'Markdown'
-                })
-            })
-        );
-        
-        await Promise.all(promises);
-        
-        // Reset form and show success
-        consultationForm.reset();
-        showConsultationSuccess();
-        
-    } catch (error) {
-        console.error('Error sending to Telegram:', error);
-        alert('Произошла ошибка при отправке заявки. Пожалуйста, попробуйте позже или свяжитесь с нами по телефону.');
-    } finally {
-        // Restore button
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-    }
-}
-
-// Show consultation success notification
-function showConsultationSuccess() {
-    const notification = document.createElement('div');
-    notification.className = 'alert alert-success position-fixed';
-    notification.style.cssText = `
-        top: 100px;
-        right: 20px;
-        z-index: 9999;
-        min-width: 350px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        border-radius: 10px;
-    `;
-    notification.innerHTML = `
-        <div class="d-flex align-items-center">
-            <i class="fas fa-check-circle me-3" style="font-size: 1.5rem; color: #28a745;"></i>
-            <div>
-                <strong>Заявка отправлена!</strong><br>
-                <small>Наш специалист свяжется с вами в течение 5 минут</small>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Add entrance animation
-    setTimeout(() => {
-        notification.style.transform = 'translateX(0)';
-        notification.style.opacity = '1';
-    }, 100);
-    
-    setTimeout(() => {
-        notification.style.transform = 'translateX(100%)';
-        notification.style.opacity = '0';
-        setTimeout(() => notification.remove(), 300);
-    }, 5000);
-}
 
 // Performance optimizations
 function optimizePerformance() {
@@ -1155,4 +1138,174 @@ function resetUrl() {
     navbar.addEventListener('hidden.bs.collapse', function() {
         burger.classList.add('collapsed');
     });
+});
+
+  (function () {
+    const allImages = [
+      'img/отзывы/отзывы-1.JPG',
+      'img/отзывы/отзывы-2.JPG',
+      'img/отзывы/отзывы-3.JPG',
+      'img/отзывы/отзывы-4.JPG',
+      'img/отзывы/отзывы-5.JPG',
+      'img/отзывы/отзывы-6.JPG',
+      'img/отзывы/отзывы-7.JPG',
+      'img/отзывы/отзывы-8.JPG',
+      'img/отзывы/отзывы-9.JPG',
+      'img/отзывы/отзывы-10.JPG',
+      'img/отзывы/отзывы-11.JPG',
+      'img/отзывы/отзывы-12.JPG',
+      'img/отзывы/отзывы-13.JPG',
+      'img/отзывы/отзывы-14.JPG'
+    ];
+
+    let startIndex = 0; // начальный сдвиг
+    const visibleCountDesktop = 5;
+    const track = document.getElementById('screenshotTrack');
+
+    function getVisible() {
+      const res = [];
+      for (let i = 0; i < visibleCountDesktop; i++) {
+        const idx = (startIndex + i) % allImages.length;
+        res.push(allImages[idx]);
+      }
+      return res;
+    }
+
+    function makeCard(src, absoluteIndex) {
+      const div = document.createElement('div');
+      div.className = 'screenshot-card';
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = 'Скриншот отзыва';
+      img.setAttribute('data-index', absoluteIndex);
+      div.appendChild(img);
+      // клик открывает модал
+      div.addEventListener('click', () => {
+        openModalAt(absoluteIndex);
+      });
+      return div;
+    }
+
+    function renderTrack() {
+      track.innerHTML = '';
+      const visible = getVisible();
+      for (let i = 0; i < visible.length; i++) {
+        const absIdx = (startIndex + i) % allImages.length;
+        track.appendChild(makeCard(visible[i], absIdx));
+      }
+    }
+
+    function shiftRight() {
+      startIndex = (startIndex + 1) % allImages.length;
+      renderTrack();
+    }
+
+    function shiftLeft() {
+      startIndex = (startIndex - 1 + allImages.length) % allImages.length;
+      renderTrack();
+    }
+
+    document.getElementById('nextArrow').addEventListener('click', () => {
+      shiftRight();
+    });
+    document.getElementById('prevArrow').addEventListener('click', () => {
+      shiftLeft();
+    });
+
+    // автопрокрутка
+    setInterval(() => {
+      shiftRight();
+    }, 5000);
+
+    // модал и большая карусель
+    const bigCarousel = document.getElementById('bigCarousel');
+    function buildBigCarousel() {
+      const inner = bigCarousel.querySelector('.carousel-inner');
+      inner.innerHTML = '';
+      allImages.forEach((src, idx) => {
+        const item = document.createElement('div');
+        item.className = 'carousel-item' + (idx === 0 ? ' active' : '');
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = 'Скриншот крупно';
+        img.className = 'd-block w-100';
+        img.style.objectFit = 'contain';
+        img.style.maxHeight = '80vh';
+        item.appendChild(img);
+        inner.appendChild(item);
+      });
+    }
+
+    function openModalAt(index) {
+      buildBigCarousel();
+      const carouselInstance = bootstrap.Carousel.getOrCreateInstance(bigCarousel);
+      carouselInstance.to(index);
+      const modal = new bootstrap.Modal(document.getElementById('screenshotModal'));
+      modal.show();
+    }
+
+    // init
+    renderTrack();
+  })();
+  document.querySelectorAll('a[href^="#"]').forEach(link => {
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        history.pushState(null, null, this.getAttribute('href'));
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+
+  // Поддержка прямого перехода по якорю при загрузке страницы
+  window.addEventListener('load', () => {
+    if (window.location.hash) {
+      const target = document.querySelector(window.location.hash);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  });
+
+  // Обновленный JavaScript код
+document.addEventListener('DOMContentLoaded', function() {
+  // Проверяем, показывалось ли уже модальное окно
+  if (!localStorage.getItem('exclusiveModalShown')) {
+    // Создаем небольшую задержку для лучшего UX
+    setTimeout(function() {
+      // Инициализируем модальное окно
+      var modalElement = document.getElementById('exclusiveOfferModal');
+      var modal = new bootstrap.Modal(modalElement);
+      
+      // Показываем модальное окно
+      modal.show();
+      
+      // Помечаем, что модальное окно было показано
+      localStorage.setItem('exclusiveModalShown', 'true');
+      
+      // Добавляем анимацию появления
+      modalElement.addEventListener('shown.bs.modal', function() {
+        const modalContent = modalElement.querySelector('.modal-content');
+        modalContent.style.transform = 'scale(1)';
+        modalContent.style.opacity = '1';
+      });
+    }, 1000); // Задержка 1 секунда перед показом
+  }
+
+  // Обработчик формы
+  document.getElementById('exclusiveOfferForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const submitBtn = this.querySelector('button[type="submit"]');
+    
+    // Изменяем кнопку при отправке
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Отправка...';
+    submitBtn.disabled = true;
+    
+    // Имитация отправки данных
+    setTimeout(() => {
+      alert('Спасибо! Ваша заявка принята. Мы свяжемся с вами в ближайшее время.');
+      bootstrap.Modal.getInstance(document.getElementById('exclusiveOfferModal')).hide();
+    }, 1500);
+  });
 });
