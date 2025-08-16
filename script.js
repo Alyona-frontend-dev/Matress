@@ -1,5 +1,16 @@
 // Initialize AOS (Animate On Scroll)
 document.addEventListener('DOMContentLoaded', function() {
+    // Show modal on page load
+    setTimeout(() => {
+        const modal = new bootstrap.Modal(document.getElementById('exclusiveOfferModal'));
+        modal.show();
+        
+        // Start hero animations when modal is closed
+        document.getElementById('exclusiveOfferModal').addEventListener('hidden.bs.modal', function() {
+            document.querySelector('.new-hero-section').classList.add('hero-animations-start');
+        });
+    }, 1000);
+
     // Initialize smooth animations
     initSmoothAnimations();
 });
@@ -1057,7 +1068,41 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    setupExclusiveOfferForm();
 });
+
+// Setup exclusive offer form
+function setupExclusiveOfferForm() {
+    const form = document.getElementById('exclusiveOfferForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            const name = formData.get('name') || form.querySelector('input[type="text"]').value;
+            const phone = formData.get('phone') || form.querySelector('input[type="tel"]').value;
+            
+            if (!name || !phone) {
+                showNotification('Пожалуйста, заполните все поля', 'error');
+                return;
+            }
+            
+            // Send to Telegram
+            sendToTelegram({
+                name: name,
+                phone: phone,
+                message: 'Заявка на получение подарков при покупке матраса'
+            });
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('exclusiveOfferModal'));
+            modal.hide();
+            
+            showNotification('Спасибо! Мы свяжемся с вами в ближайшее время', 'success');
+        });
+    }
+}
 
 
 // Performance optimizations
